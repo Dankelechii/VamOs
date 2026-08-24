@@ -2,7 +2,7 @@
 
 A social travel app: fill in countries on a world map as you visit them, save photos from each trip, and see where your friends have been.
 
-The map, trips, notes and checklist work fully offline on device storage (`AsyncStorage`) — no account needed. Accounts, usernames, friend requests and map sync are real, running against Supabase (see `supabase/README.md` for setup); the Friends tab explains plainly when no backend is configured and falls back to local-only. Photo *sync* across devices/friends is not yet wired up — see "Known limitations" below.
+The map, trips, notes and checklist work fully offline on device storage (`AsyncStorage`) — no account needed. Accounts, usernames, friend requests, and map sync — including trip photos — are real, running against Supabase (see `supabase/README.md` for setup); the Friends tab explains plainly when no backend is configured and falls back to local-only.
 
 ## What's in here
 
@@ -13,8 +13,8 @@ The map, trips, notes and checklist work fully offline on device storage (`Async
 
 ## Known limitations
 
-- **Photo sync isn't switched on.** `trip_photos` and its storage bucket exist in the schema, but photos stay device-local — a friend sees your visited countries and trip notes, never your photos. See `supabase/README.md` → "Notes for later".
 - **Reports have no admin UI.** Blocking someone inserts a row into `reports` (see schema), but nothing alerts a human yet — check `select * from reports where reviewed_at is null` manually until that's wired up.
+- **No restore-on-new-device for your own account.** Signing in on a fresh install pushes local data up but doesn't pull your previously-synced trips back down yet — friends' data already works this way (see `fetchVisited` in `src/services/social.ts`), your own account just doesn't call it on sign-in yet.
 
 ## Running it
 
@@ -63,16 +63,20 @@ Real logo/icon assets are in `assets/` (wordmark, icon, splash, Android adaptive
 - Add search/filter on the map and a country list view as an alternative to tapping the map directly.
 - Add a social feed (e.g. "Priya just checked in to Vietnam").
 
-## Feedback
+## Feedback & collaboration
 
 This is a real, working app, pre-App-Store-release, and I'd genuinely like to hear
-from anyone who tries it. Most useful right now:
+from anyone who tries it — and I'm open to collaborators, not just bug reports. Most
+useful right now:
 
 - **Bugs** — anything that crashes, looks wrong, or behaves unexpectedly. [Open an issue](../../issues/new).
 - **Confusing UX** — if a screen made you pause and think "wait, what?", that's worth
   reporting even if nothing technically broke.
 - **Feature thoughts, general reactions, "have you considered..."** — [Discussions](../../discussions)
   is the right place for anything more open-ended than a bug report.
+- **Pull requests** — genuinely welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+  what to check before opening one, and the "Known limitations" and "Suggested next
+  steps" sections above for concrete places to start.
 
 Screenshots/screen recordings are always welcome and make bug reports much faster to
 act on. If you spot something security- or privacy-related, please open an issue
