@@ -27,6 +27,14 @@ npx expo start
 
 Scan the QR code that appears with your phone's camera (iOS) or the Expo Go app (Android). The app will load over your local network — make sure your phone and computer are on the same Wi-Fi.
 
+> **iOS note:** this project tracks a very current Expo SDK. If Expo Go says the
+> project "requires a newer version of Expo Go," that's Apple's App Store review
+> lagging behind Expo's release, not something wrong with the app — the App Store
+> build of Expo Go periodically falls a version or two behind. Android isn't affected
+> (Play Store review is faster). Workarounds: the iOS Simulator (needs a Mac), or
+> `eas go` (needs a paid Apple Developer account) — see Expo's changelog for current
+> status.
+
 ## Project structure
 
 ```
@@ -51,7 +59,21 @@ Real logo/icon assets are in `assets/` (wordmark, icon, splash, Android adaptive
 
 ## Suggested next steps
 
-- Turn on photo sync (`trip_photos` + the `trip-photos` storage bucket are already scaffolded — see `supabase/README.md`).
 - Wire an alert (email/Slack) on new `reports` rows instead of relying on someone to check the table.
 - Add search/filter on the map and a country list view as an alternative to tapping the map directly.
 - Add a social feed (e.g. "Priya just checked in to Vietnam").
+
+## Feedback
+
+This is a real, working app, pre-App-Store-release, and I'd genuinely like to hear
+from anyone who tries it. Most useful right now:
+
+- **Bugs** — anything that crashes, looks wrong, or behaves unexpectedly. [Open an issue](../../issues/new).
+- **Confusing UX** — if a screen made you pause and think "wait, what?", that's worth
+  reporting even if nothing technically broke.
+- **Feature thoughts, general reactions, "have you considered..."** — [Discussions](../../discussions)
+  is the right place for anything more open-ended than a bug report.
+
+Screenshots/screen recordings are always welcome and make bug reports much faster to
+act on. If you spot something security- or privacy-related, please open an issue
+rather than a public Discussion so it can be looked at before it's widely visible.
