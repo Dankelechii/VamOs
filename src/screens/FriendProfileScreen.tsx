@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BadgeRow from "../components/BadgeRow";
 import StatBadge from "../components/StatBadge";
 import Globe3D from "../components/Globe3D";
+import CountrySearch from "../components/CountrySearch";
 import { useThemeColors } from "../context/ThemeContext";
 import { useTravel } from "../context/TravelContext";
 import { getVisitedContinents } from "../data/badges";
@@ -121,6 +122,16 @@ export default function FriendProfileScreen() {
           <BadgeRow continentCount={continentCount} ownerLabel={`${friend.name.split(" ")[0]}'s`} />
         </View>
 
+        <View style={styles.searchWrap}>
+          <CountrySearch
+            onSelectCountry={(id) => {
+              setPinnedCountryId(id);
+              navigation.navigate("CountryDetail", { countryId: id, ownerId: friend.id });
+            }}
+            placeholder={`Find a country on ${friend.name.split(" ")[0]}'s map…`}
+          />
+        </View>
+
         <View style={styles.mapCard}>
           <Globe3D
             visitedIds={visitedIds}
@@ -181,6 +192,7 @@ function createStyles(colors: ColorPalette) {
       borderColor: colors.cardBorder,
       padding: 16,
     },
+    searchWrap: { marginHorizontal: 20, marginBottom: 12 },
     mapCard: {
       marginHorizontal: 12,
       aspectRatio: 1,

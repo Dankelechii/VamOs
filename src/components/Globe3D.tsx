@@ -330,7 +330,10 @@ export default function Globe3D({
   const draggingRef = useRef(false);
 
   return (
-    <Canvas style={{ flex: 1 }} camera={{ position: [0, 0, 2.6], fov: 40 }}>
+    // Sphere radius is 1; at fov 40° a camera needs distance >= ~2.75 just to fit it
+    // in frame at all (distance * tan(fov/2) >= radius) — 2.6 was cropping the globe
+    // at the edges on every screen. 3.8 leaves visible margin around it instead.
+    <Canvas style={{ flex: 1 }} camera={{ position: [0, 0, 3.8], fov: 40 }}>
       <React.Suspense fallback={null}>
         <GlobeScene
           visitedIds={visitedIds}

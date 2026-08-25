@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import StatBadge from "../components/StatBadge";
 import TravelChecklist from "../components/TravelChecklist";
 import Globe3D from "../components/Globe3D";
+import CountrySearch from "../components/CountrySearch";
 import { useThemeColors } from "../context/ThemeContext";
 import { useTravel } from "../context/TravelContext";
 import { RootStackParamList } from "../navigation/types";
@@ -28,6 +29,11 @@ export default function MapScreen() {
 
   const visitedIds = useMemo(() => new Set(Object.keys(visited)), [visited]);
   const pct = totalCountries > 0 ? Math.round((visitedCount / totalCountries) * 100) : 0;
+
+  const selectCountry = (id: string) => {
+    setPinnedCountryId(id);
+    navigation.navigate("CountryDetail", { countryId: id, ownerId: "me" });
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -69,14 +75,15 @@ export default function MapScreen() {
           <StatBadge value={`${pct}%`} label="of the world" />
         </View>
 
+        <View style={styles.searchWrap}>
+          <CountrySearch onSelectCountry={selectCountry} />
+        </View>
+
         <View style={styles.mapCard}>
           <Globe3D
             visitedIds={visitedIds}
             selectedId={pinnedCountryId}
-            onSelectCountry={(id) => {
-              setPinnedCountryId(id);
-              navigation.navigate("CountryDetail", { countryId: id, ownerId: "me" });
-            }}
+            onSelectCountry={selectCountry}
             colors={{
               ocean: colors.ocean,
               unvisited: colors.unvisited,
@@ -159,6 +166,7 @@ function createStyles(colors: ColorPalette) {
       marginBottom: 12,
     },
     statDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: colors.cardBorder },
+    searchWrap: { paddingHorizontal: 20, marginBottom: 12 },
     mapCard: {
       marginHorizontal: 12,
       aspectRatio: 1,
