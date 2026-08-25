@@ -1,0 +1,303 @@
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useLoader, ThreeEvent } from "@react-three/fiber";
+import * as THREE from "three";
+import { GLOBE_COUNTRY_RINGS, GlobeCountryRings } from "../data/globeCountryRings";
+
+const ID_MAP_ASSET = require("../../assets/globe-id-map.png");
+
+// Matches geodata/generate-globe-assets.js's lngLatToPixel: u=(lng+180)/360,
+// v=(90-lat)/180. THREE's default sphere UVs are used as-is for the shader sample
+// (vUv), so as long as this inverse is the one used everywhere a UV needs converting
+// back to a coordinate (only here, for tap-to-select), the texture and the hit-test
+// necessarily agree with each other regardless of which way the sphere "actually"
+// faces — a mismatch there would show up as the whole globe looking rotated, not as
+// taps landing on the wrong country.
+function uvToLngLat(u: number, v: number): [number, number] {
+  return [u * 360 - 180, 90 - v * 180];
+}
+
+function pointInRing(lng: number, lat: number, ring: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function hitTestCountry(lng: number, lat: number): GlobeCountryRings | null {
+  for (const country of GLOBE_COUNTRY_RINGS) {
+    const [[minLng, minLat], [maxLng, maxLat]] = country.bounds;
+    if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+    for (const ring of country.rings) {
+      if (pointInRing(lng, lat, ring)) return country;
+    }
+  }
+  return null;
+}
+
+const VERTEX_SHADER = `
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// uIdMap's red channel (0..1) decodes back to a country index 0..255 (0 = ocean).
+// uVisited is a tiny 256x1 lookup texture, one texel per possible index, red channel
+// 1.0/0.0 — indirection through a texture (rather than a uniform array indexed by a
+// value computed in-shader) is what GLSL ES / WebGL1 actually allows on all hardware.
+const FRAGMENT_SHADER = `
+  precision mediump float;
+  uniform sampler2D uIdMap;
+  uniform sampler2D uVisited;
+  uniform vec2 uTexelSize;
+  uniform vec3 uOceanColor;
+  uniform vec3 uUnvisitedColor;
+  uniform vec3 uVisitedColor;
+  uniform vec3 uSelectedColor;
+  uniform vec3 uBorderColor;
+  uniform float uSelectedIndex;
+  uniform vec3 uSunDirection;
+  varying vec2 vUv;
+  varying vec3 vNormal;
+
+  float idAt(vec2 uv) {
+    return floor(texture2D(uIdMap, uv).r * 255.0 + 0.5);
+  }
+
+  void main() {
+    float id = idAt(vUv);
+    vec3 base;
+    if (id < 0.5) {
+      base = uOceanColor;
+    } else if (abs(id - uSelectedIndex) < 0.5) {
+      base = uSelectedColor;
+    } else {
+      float visited = texture2D(uVisited, vec2((id + 0.5) / 256.0, 0.5)).r;
+      base = mix(uUnvisitedColor, uVisitedColor, visited);
+    }
+
+    // Coastline/border: any neighbour texel with a different id gets a thin highlight.
+    float n = idAt(vUv + vec2(0.0, uTexelSize.y));
+    float s = idAt(vUv - vec2(0.0, uTexelSize.y));
+    float e = idAt(vUv + vec2(uTexelSize.x, 0.0));
+    float w = idAt(vUv - vec2(uTexelSize.x, 0.0));
+    bool isBorder = n != id || s != id || e != id || w != id;
+
+    vec3 color = isBorder ? mix(base, uBorderColor, 0.55) : base;
+
+    float lambert = max(dot(normalize(vNormal), normalize(uSunDirection)), 0.0);
+    float lighting = 0.45 + 0.55 * lambert;
+    gl_FragColor = vec4(color * lighting, 1.0);
+  }
+`;
+
+interface GlobeUniforms {
+  [key: string]: THREE.IUniform;
+  uIdMap: { value: THREE.Texture | null };
+  uVisited: { value: THREE.DataTexture };
+  uTexelSize: { value: THREE.Vector2 };
+  uOceanColor: { value: THREE.Color };
+  uUnvisitedColor: { value: THREE.Color };
+  uVisitedColor: { value: THREE.Color };
+  uSelectedColor: { value: THREE.Color };
+  uBorderColor: { value: THREE.Color };
+  uSelectedIndex: { value: number };
+  uSunDirection: { value: THREE.Vector3 };
+}
+
+const INDEX_BY_ID = new Map(GLOBE_COUNTRY_RINGS.map((c) => [c.id, c.index]));
+const MAX_TILT = 1.35; // radians — stops just short of looking straight down a pole
+
+function makeVisitedTexture(): THREE.DataTexture {
+  const data = new Uint8Array(256 * 4);
+  const texture = new THREE.DataTexture(data, 256, 1, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+interface GlobeSceneProps {
+  visitedIds: Set<string>;
+  selectedId: string | null;
+  onSelectCountry: (id: string) => void;
+  rotationRef: React.MutableRefObject<{ x: number; y: number }>;
+  draggingRef: React.MutableRefObject<boolean>;
+  colors: GlobeColors;
+}
+
+export interface GlobeColors {
+  ocean: string;
+  unvisited: string;
+  visited: string;
+  selected: string;
+  border: string;
+}
+
+function GlobeScene({
+  visitedIds,
+  selectedId,
+  onSelectCountry,
+  rotationRef,
+  draggingRef,
+  colors,
+}: GlobeSceneProps) {
+  const groupRef = useRef<THREE.Group>(null!);
+  const idMap = useLoader(THREE.TextureLoader, ID_MAP_ASSET) as THREE.Texture;
+  idMap.minFilter = THREE.NearestFilter;
+  idMap.magFilter = THREE.NearestFilter;
+  idMap.wrapS = THREE.RepeatWrapping;
+
+  const visitedTexture = useMemo(() => makeVisitedTexture(), []);
+
+  useEffect(() => {
+    const data = visitedTexture.image.data as Uint8Array;
+    data.fill(0);
+    for (const id of visitedIds) {
+      const index = INDEX_BY_ID.get(id);
+      if (index === undefined) continue;
+      data[index * 4] = 255;
+    }
+    visitedTexture.needsUpdate = true;
+  }, [visitedIds, visitedTexture]);
+
+  const uniforms = useMemo<GlobeUniforms>(
+    () => ({
+      uIdMap: { value: idMap },
+      uVisited: { value: visitedTexture },
+      uTexelSize: { value: new THREE.Vector2(1 / 2048, 1 / 1024) },
+      uOceanColor: { value: new THREE.Color(colors.ocean) },
+      uUnvisitedColor: { value: new THREE.Color(colors.unvisited) },
+      uVisitedColor: { value: new THREE.Color(colors.visited) },
+      uSelectedColor: { value: new THREE.Color(colors.selected) },
+      uBorderColor: { value: new THREE.Color(colors.border) },
+      uSelectedIndex: { value: -1 },
+      uSunDirection: { value: new THREE.Vector3(0.6, 0.5, 0.7) },
+    }),
+    [idMap, visitedTexture, colors]
+  );
+
+  useEffect(() => {
+    uniforms.uSelectedIndex.value = selectedId ? INDEX_BY_ID.get(selectedId) ?? -1 : -1;
+  }, [selectedId, uniforms]);
+
+  useFrame((_, delta) => {
+    if (!draggingRef.current) {
+      rotationRef.current.y += delta * 0.06; // slow idle spin, "Google Earth" style
+    }
+    if (groupRef.current) {
+      groupRef.current.rotation.y = rotationRef.current.y;
+      groupRef.current.rotation.x = rotationRef.current.x;
+    }
+  });
+
+  // Rotation and tap-to-select both live on the sphere's own r3f pointer events
+  // rather than splitting them across a separate RN gesture library — two systems
+  // racing to interpret the same touch is what made plain taps get eaten as
+  // micro-drags. moved.current is what tells pointerUp whether this was a drag
+  // (rotate) or a tap (select); it only flips once real movement crosses the
+  // threshold, so a stationary tap is never misread as a drag.
+  const pointer = useRef({ down: false, startX: 0, startY: 0, startRotX: 0, startRotY: 0, moved: false });
+
+  const handlePointerDown = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation();
+      pointer.current = {
+        down: true,
+        startX: event.clientX,
+        startY: event.clientY,
+        startRotX: rotationRef.current.x,
+        startRotY: rotationRef.current.y,
+        moved: false,
+      };
+    },
+    [rotationRef]
+  );
+
+  const handlePointerMove = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      if (!pointer.current.down) return;
+      const dx = event.clientX - pointer.current.startX;
+      const dy = event.clientY - pointer.current.startY;
+      if (!pointer.current.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      pointer.current.moved = true;
+      draggingRef.current = true;
+      rotationRef.current.y = pointer.current.startRotY + dx * 0.008;
+      rotationRef.current.x = Math.max(
+        -MAX_TILT,
+        Math.min(MAX_TILT, pointer.current.startRotX + dy * 0.008)
+      );
+    },
+    [rotationRef, draggingRef]
+  );
+
+  const handlePointerUp = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      if (!pointer.current.moved && event.uv) {
+        const [lng, lat] = uvToLngLat(event.uv.x, event.uv.y);
+        const hit = hitTestCountry(lng, lat);
+        if (hit) onSelectCountry(hit.id);
+      }
+      pointer.current.down = false;
+      draggingRef.current = false;
+    },
+    [onSelectCountry, draggingRef]
+  );
+
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <group ref={groupRef}>
+        <mesh
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          <sphereGeometry args={[1, 64, 64]} />
+          <shaderMaterial
+            uniforms={uniforms}
+            vertexShader={VERTEX_SHADER}
+            fragmentShader={FRAGMENT_SHADER}
+          />
+        </mesh>
+      </group>
+    </>
+  );
+}
+
+export interface Globe3DProps {
+  visitedIds: Set<string>;
+  selectedId?: string | null;
+  onSelectCountry: (id: string) => void;
+  colors: GlobeColors;
+}
+
+export default function Globe3D({
+  visitedIds,
+  selectedId = null,
+  onSelectCountry,
+  colors,
+}: Globe3DProps) {
+  const rotationRef = useRef({ x: -0.15, y: 0.4 });
+  const draggingRef = useRef(false);
+
+  return (
+    <Canvas style={{ flex: 1 }} camera={{ position: [0, 0, 2.6], fov: 40 }}>
+      <React.Suspense fallback={null}>
+        <GlobeScene
+          visitedIds={visitedIds}
+          selectedId={selectedId}
+          onSelectCountry={onSelectCountry}
+          rotationRef={rotationRef}
+          draggingRef={draggingRef}
+          colors={colors}
+        />
+      </React.Suspense>
+    </Canvas>
+  );
+}

@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import StatBadge from "../components/StatBadge";
 import TravelChecklist from "../components/TravelChecklist";
-import WorldMapSvg from "../components/WorldMapSvg";
+import Globe3D from "../components/Globe3D";
 import { useThemeColors } from "../context/ThemeContext";
 import { useTravel } from "../context/TravelContext";
 import { RootStackParamList } from "../navigation/types";
@@ -70,12 +70,19 @@ export default function MapScreen() {
         </View>
 
         <View style={styles.mapCard}>
-          <WorldMapSvg
+          <Globe3D
             visitedIds={visitedIds}
             selectedId={pinnedCountryId}
             onSelectCountry={(id) => {
               setPinnedCountryId(id);
               navigation.navigate("CountryDetail", { countryId: id, ownerId: "me" });
+            }}
+            colors={{
+              ocean: colors.ocean,
+              unvisited: colors.unvisited,
+              visited: colors.visited,
+              selected: colors.visitedSelected,
+              border: colors.unvisitedStroke,
             }}
           />
         </View>
@@ -154,6 +161,7 @@ function createStyles(colors: ColorPalette) {
     statDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: colors.cardBorder },
     mapCard: {
       marginHorizontal: 12,
+      aspectRatio: 1,
       borderRadius: 20,
       overflow: "hidden",
       borderWidth: 1,

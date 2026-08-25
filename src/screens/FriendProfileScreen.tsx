@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import BadgeRow from "../components/BadgeRow";
 import StatBadge from "../components/StatBadge";
-import WorldMapSvg from "../components/WorldMapSvg";
+import Globe3D from "../components/Globe3D";
 import { useThemeColors } from "../context/ThemeContext";
 import { useTravel } from "../context/TravelContext";
 import { getVisitedContinents } from "../data/badges";
@@ -122,9 +122,15 @@ export default function FriendProfileScreen() {
         </View>
 
         <View style={styles.mapCard}>
-          <WorldMapSvg
+          <Globe3D
             visitedIds={visitedIds}
-            visitedColor={friend.avatarColor}
+            colors={{
+              ocean: colors.ocean,
+              unvisited: colors.unvisited,
+              visited: friend.avatarColor,
+              selected: colors.visitedSelected,
+              border: colors.unvisitedStroke,
+            }}
             selectedId={pinnedCountryId}
             onSelectCountry={(id) => {
               setPinnedCountryId(id);
@@ -177,6 +183,7 @@ function createStyles(colors: ColorPalette) {
     },
     mapCard: {
       marginHorizontal: 12,
+      aspectRatio: 1,
       borderRadius: 20,
       overflow: "hidden",
       borderWidth: 1,
