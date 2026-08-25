@@ -37,6 +37,8 @@ export interface UserProfile {
   avatarColor: string;
   bio?: string;
   instagramHandle?: string;
+  /** Local device photo URI. Optional — falls back to avatarEmoji/avatarColor when unset. */
+  avatarPhotoUri?: string;
 }
 
 export interface Friend extends UserProfile {

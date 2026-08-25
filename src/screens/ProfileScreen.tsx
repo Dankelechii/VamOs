@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -13,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -27,7 +29,7 @@ import StatBadge from "../components/StatBadge";
 import { useTheme, useThemeColors } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useTravel } from "../context/TravelContext";
-import { getVisitedContinents } from "../data/badges";
+import { getCurrentBadge, getVisitedContinents } from "../data/badges";
 import { DEFAULT_PROFILE } from "../data/mockData";
 import { useMapSync } from "../hooks/useMapSync";
 import { deleteAccount, signOut } from "../services/social";
@@ -69,6 +71,10 @@ export default function ProfileScreen() {
 
   const pct = totalCountries > 0 ? Math.round((visitedCount / totalCountries) * 100) : 0;
   const continentCount = useMemo(() => getVisitedContinents(visited).size, [visited]);
+  // The halo is earned, not decorative — it's the same badge color as the row below,
+  // so the two reinforce each other rather than saying the same thing two ways.
+  const currentBadge = useMemo(() => getCurrentBadge(continentCount), [continentCount]);
+  const haloColor = currentBadge?.color ?? profile.avatarColor;
 
   // Photos live on trips now, so they're flattened out of the timeline rather than
   // read off the country. Each carries its country so the wheel can draw that
@@ -149,6 +155,38 @@ export default function ProfileScreen() {
     setEditModalVisible(true);
   };
 
+  const pickAvatarPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Allow photo library access to set a profile photo.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets?.length) return;
+    updateProfile({ avatarPhotoUri: result.assets[0].uri });
+  };
+
+  const handleAvatarPress = () => {
+    if (!profile.avatarPhotoUri) {
+      pickAvatarPhoto();
+      return;
+    }
+    Alert.alert("Profile photo", undefined, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Change photo", onPress: pickAvatarPhoto },
+      {
+        text: "Remove photo",
+        style: "destructive",
+        onPress: () => updateProfile({ avatarPhotoUri: undefined }),
+      },
+    ]);
+  };
+
   const saveProfile = () => {
     const name = nameDraft.trim();
     const handle = handleDraft.trim().replace(/^@/, "");
@@ -188,8 +226,21 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.headerRow} onPress={openEditModal} accessibilityLabel="Edit your profile">
-          <View style={[styles.avatar, { backgroundColor: profile.avatarColor + "33", borderColor: profile.avatarColor }]}>
-            <Text style={styles.avatarEmoji}>{profile.avatarEmoji}</Text>
+          <View style={[styles.haloRing, { borderColor: haloColor, shadowColor: haloColor }]}>
+            <Pressable
+              onPress={handleAvatarPress}
+              accessibilityLabel="Change profile photo"
+              style={[styles.avatar, { backgroundColor: profile.avatarColor + "33", borderColor: profile.avatarColor }]}
+            >
+              {profile.avatarPhotoUri ? (
+                <Image source={{ uri: profile.avatarPhotoUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarEmoji}>{profile.avatarEmoji}</Text>
+              )}
+              <View style={[styles.avatarCameraBadge, { backgroundColor: haloColor }]}>
+                <Ionicons name="camera" size={12} color="#182242" />
+              </View>
+            </Pressable>
           </View>
           <Text style={styles.name}>{profile.name}</Text>
           <Text style={styles.handle}>{profile.handle}</Text>
@@ -456,6 +507,23 @@ function createStyles(colors: ColorPalette) {
     safe: { flex: 1, backgroundColor: colors.bg },
     scrollContent: { paddingBottom: 48 },
     headerRow: { alignItems: "center", paddingHorizontal: 20, marginTop: 8, marginBottom: 8 },
+    // The halo: a ring earned by continent badge, one size up from the avatar so it
+    // reads as a glow around it rather than just a thicker border on the avatar
+    // itself. Shadow uses the same color for an actual soft-glow feel, not just a
+    // hard ring — most visible on the darker theme where a glow can read at all.
+    haloRing: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      borderWidth: 3,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+      shadowOpacity: 0.55,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 6,
+    },
     avatar: {
       width: 84,
       height: 84,
@@ -463,7 +531,20 @@ function createStyles(colors: ColorPalette) {
       borderWidth: 2,
       alignItems: "center",
       justifyContent: "center",
-      marginBottom: 12,
+      overflow: "hidden",
+    },
+    avatarImage: { width: "100%", height: "100%" },
+    avatarCameraBadge: {
+      position: "absolute",
+      right: -2,
+      bottom: -2,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: colors.bg,
     },
     avatarEmoji: { fontSize: 38 },
     name: { color: colors.textPrimary, fontSize: 22, fontWeight: "800" },
