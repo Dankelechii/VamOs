@@ -75,6 +75,27 @@ function hitTestCountry(lng: number, lat: number): GlobeCountryRings | null {
   return null;
 }
 
+// Widening rings of sample points around a near-miss, checked closest-first. Exists
+// because touch/mouse precision and border precision are both finite — a tap that
+// lands just outside a country's actual boundary (easy to do for anything small, and
+// for anything currently near the edge of the visible globe where the surface is
+// heavily foreshortened) should still resolve to "the country you were obviously
+// aiming at" rather than silently doing nothing.
+const FUZZY_RADII_DEG = [0.15, 0.3, 0.5, 0.8];
+
+function hitTestCountryFuzzy(lng: number, lat: number): GlobeCountryRings | null {
+  const exact = hitTestCountry(lng, lat);
+  if (exact) return exact;
+  for (const radius of FUZZY_RADII_DEG) {
+    for (let angle = 0; angle < 360; angle += 45) {
+      const rad = (angle * Math.PI) / 180;
+      const candidate = hitTestCountry(lng + radius * Math.cos(rad), lat + radius * Math.sin(rad));
+      if (candidate) return candidate;
+    }
+  }
+  return null;
+}
+
 const VERTEX_SHADER = `
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -283,7 +304,7 @@ function GlobeScene({
     (event: ThreeEvent<PointerEvent>) => {
       if (!pointer.current.moved && event.uv) {
         const [lng, lat] = uvToLngLat(event.uv.x, event.uv.y);
-        const hit = hitTestCountry(lng, lat);
+        const hit = hitTestCountryFuzzy(lng, lat);
         if (hit) onSelectCountry(hit.id);
       }
       pointer.current.down = false;
@@ -330,10 +351,15 @@ export default function Globe3D({
   const draggingRef = useRef(false);
 
   return (
-    // Sphere radius is 1; at fov 40° a camera needs distance >= ~2.75 just to fit it
-    // in frame at all (distance * tan(fov/2) >= radius) — 2.6 was cropping the globe
-    // at the edges on every screen. 3.8 leaves visible margin around it instead.
-    <Canvas style={{ flex: 1 }} camera={{ position: [0, 0, 3.8], fov: 40 }}>
+    // A narrower fov (pushed back further to compensate, keeping the sphere the same
+    // apparent size) trades wide-angle "fisheye" character for something closer to
+    // orthographic — the point isn't taste, it's that wide-fov perspective compresses
+    // the sphere's surface hard near the limb, so a fixed screen-space tap area covers
+    // much more real surface there than at the center. Countries near the edge of
+    // whatever's currently in view (which is most of a continent as wide as Asia,
+    // most of the time) were disproportionately hard to land a tap on as a direct
+    // result. distance * tan(fov/2) >= radius(1) is still the fit-in-frame floor.
+    <Canvas style={{ flex: 1 }} camera={{ position: [0, 0, 6.5], fov: 24 }}>
       <React.Suspense fallback={null}>
         <GlobeScene
           visitedIds={visitedIds}
