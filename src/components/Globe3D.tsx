@@ -252,8 +252,15 @@ function GlobeScene({
         startRotY: rotationRef.current.y,
         moved: false,
       };
+      // Freeze the idle spin for the whole touch, not just once it's recognized as a
+      // drag: the idle spin previously kept running for however long a finger sat on
+      // the globe deciding whether to tap, so the country under a stationary tap could
+      // drift away from what was actually pressed by release time — worst for
+      // small, tightly-packed countries (a lot of West Africa) where even a
+      // fraction of a degree of drift lands the tap in a neighbour instead.
+      draggingRef.current = true;
     },
-    [rotationRef]
+    [rotationRef, draggingRef]
   );
 
   const handlePointerMove = useCallback(
@@ -262,8 +269,7 @@ function GlobeScene({
       const dx = event.clientX - pointer.current.startX;
       const dy = event.clientY - pointer.current.startY;
       if (!pointer.current.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      pointer.current.moved = true;
-      draggingRef.current = true;
+      pointer.current.moved = true; // idle spin is already frozen, from pointerDown
       rotationRef.current.y = pointer.current.startRotY + dx * 0.008;
       rotationRef.current.x = Math.max(
         -MAX_TILT,
