@@ -16,7 +16,29 @@ function uvToLngLat(u: number, v: number): [number, number] {
   return [u * 360 - 180, 90 - v * 180];
 }
 
-function pointInRing(lng: number, lat: number, ring: [number, number][]): boolean {
+// Same fix as generate-globe-assets.js's unwrapRing, applied at hit-test time instead
+// of at raster time: GLOBE_COUNTRY_RINGS stores raw (non-unwrapped) lng/lat, so a ring
+// that touches the antimeridian (Russia, Fiji, ...) has a "seam" edge jumping from
+// ~+179° to ~-179° between consecutive points. A plain ray-cast treats that as a real
+// edge spanning nearly the whole globe, which corrupts the inside/outside parity for
+// every test point at that ring's latitude — not just points near the seam — which is
+// exactly why Russia was swallowing chunks of Alaska. Unwrapping the ring into a
+// continuous sequence (which can run outside [-180, 180]) fixes the parity; testing
+// the tapped point at lng, lng+360, and lng-360 covers whichever "copy" of the point
+// lines up with wherever the ring's own unwrapped range ended up.
+function unwrapRingLngLat(ring: [number, number][]): [number, number][] {
+  let offset = 0;
+  let prevLng = ring[0][0];
+  return ring.map(([lng, lat]) => {
+    const delta = lng - prevLng;
+    if (delta > 180) offset -= 360;
+    else if (delta < -180) offset += 360;
+    prevLng = lng;
+    return [lng + offset, lat];
+  });
+}
+
+function rayCastInRing(lng: number, lat: number, ring: [number, number][]): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i];
@@ -27,10 +49,25 @@ function pointInRing(lng: number, lat: number, ring: [number, number][]): boolea
   return inside;
 }
 
+function pointInRing(lng: number, lat: number, ring: [number, number][]): boolean {
+  const unwrapped = unwrapRingLngLat(ring);
+  return (
+    rayCastInRing(lng, lat, unwrapped) ||
+    rayCastInRing(lng + 360, lat, unwrapped) ||
+    rayCastInRing(lng - 360, lat, unwrapped)
+  );
+}
+
 function hitTestCountry(lng: number, lat: number): GlobeCountryRings | null {
   for (const country of GLOBE_COUNTRY_RINGS) {
     const [[minLng, minLat], [maxLng, maxLat]] = country.bounds;
-    if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+    // Bounds are also raw/non-unwrapped, so a seam-touching country's bbox is already
+    // wide (close to the full -180..180 span) rather than wrong — safe to bbox-reject
+    // on latitude, but skip the longitude bbox check for anything wide enough to
+    // plausibly be a seam country rather than risk a false reject.
+    const spansSeam = maxLng - minLng > 180;
+    if (lat < minLat || lat > maxLat) continue;
+    if (!spansSeam && (lng < minLng || lng > maxLng)) continue;
     for (const ring of country.rings) {
       if (pointInRing(lng, lat, ring)) return country;
     }
