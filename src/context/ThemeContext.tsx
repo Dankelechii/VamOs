@@ -19,14 +19,25 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
-  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  // "system" was dropped as a user-facing choice (no button for it anymore — light
+  // and dark are the whole set), so the default landing spot is the brand-forward
+  // light theme rather than something that follows the OS.
+  const [preference, setPreferenceState] = useState<ThemePreference>("light");
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY_THEME).then((stored) => {
-      if (stored === "light" || stored === "dark" || stored === "system") {
+      if (stored === "light" || stored === "dark") {
         setPreferenceState(stored);
+      } else if (stored === "system") {
+        // Migrate anyone who had the now-removed option selected onto whichever
+        // theme it was actually resolving to, so nothing changes for them visually
+        // and a button is correctly highlighted next time they open this screen.
+        const resolved: ThemePreference = systemScheme === "dark" ? "dark" : "light";
+        setPreferenceState(resolved);
+        AsyncStorage.setItem(STORAGE_KEY_THEME, resolved).catch(() => {});
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setPreference = (pref: ThemePreference) => {

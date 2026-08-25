@@ -17,9 +17,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Button from "../components/Button";
+import ContentWidth from "../components/ContentWidth";
 import { useAuth } from "../context/AuthContext";
+import { useLayoutMode } from "../context/LayoutModeContext";
 import { useThemeColors } from "../context/ThemeContext";
 import { RootStackParamList } from "../navigation/types";
+import { WEB_TOP_NAV_HEIGHT } from "../navigation/WebTopNav";
 import {
   acceptFriendRequest,
   blockUser,
@@ -39,6 +42,7 @@ export default function FriendsScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { backendConfigured, loading: authLoading, userId } = useAuth();
+  const { mode: layoutMode } = useLayoutMode();
 
   const [edges, setEdges] = useState<FriendEdge[]>([]);
   const [query, setQuery] = useState("");
@@ -213,7 +217,7 @@ export default function FriendsScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, layoutMode === "website" && styles.webContent]}
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
@@ -227,6 +231,7 @@ export default function FriendsScreen() {
             />
           }
         >
+          <ContentWidth>
           <Text style={styles.title}>Friends</Text>
 
           <View style={styles.searchBox}>
@@ -318,6 +323,7 @@ export default function FriendsScreen() {
               )}
             </View>
           )}
+          </ContentWidth>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -329,6 +335,10 @@ function createStyles(colors: ColorPalette) {
     safe: { flex: 1, backgroundColor: colors.bg },
     flex: { flex: 1 },
     content: { padding: 20, paddingBottom: 40 },
+    // padding + paddingTop (not paddingHorizontal alongside the base `content`'s
+    // padding:20) so this fully overrides rather than merging shorthand with
+    // longhand across two style objects, which RN doesn't resolve predictably.
+    webContent: { padding: 24, paddingTop: WEB_TOP_NAV_HEIGHT + 28, paddingBottom: 40 },
     centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
     title: { color: colors.textPrimary, fontSize: 24, fontWeight: "800", marginBottom: 16 },
     searchBox: {

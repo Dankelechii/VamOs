@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { FEATURES } from "../config/features";
+import { useLayoutMode } from "../context/LayoutModeContext";
 import { useTheme, useThemeColors } from "../context/ThemeContext";
 import CountryDetailScreen from "../screens/CountryDetailScreen";
 import FriendProfileScreen from "../screens/FriendProfileScreen";
@@ -13,6 +14,7 @@ import MapScreen from "../screens/MapScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import { ColorPalette } from "../theme/colors";
 import { RootStackParamList, TabParamList } from "./types";
+import WebTopNav from "./WebTopNav";
 
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,8 +36,10 @@ function buildNavTheme(colors: ColorPalette, scheme: "light" | "dark"): Theme {
 
 function Tabs() {
   const colors = useThemeColors();
+  const { mode } = useLayoutMode();
   return (
     <Tab.Navigator
+      tabBar={mode === "website" ? (props) => <WebTopNav {...props} /> : undefined}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {

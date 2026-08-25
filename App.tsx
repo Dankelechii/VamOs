@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ErrorBoundary from "./src/components/ErrorBoundary";
 import { AuthProvider } from "./src/context/AuthContext";
+import { LayoutModeProvider } from "./src/context/LayoutModeContext";
 import { ThemeProvider, useThemeColors, useTheme } from "./src/context/ThemeContext";
 import { TravelProvider, useTravel } from "./src/context/TravelContext";
 import RootNavigator from "./src/navigation/RootNavigator";
@@ -47,7 +48,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <Root />
+        <LayoutModeProvider>
+          <Root />
+        </LayoutModeProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

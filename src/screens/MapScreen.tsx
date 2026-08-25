@@ -15,14 +15,18 @@ import StatBadge from "../components/StatBadge";
 import TravelChecklist from "../components/TravelChecklist";
 import Globe3D from "../components/Globe3D";
 import CountrySearch from "../components/CountrySearch";
+import ContentWidth from "../components/ContentWidth";
+import { useLayoutMode } from "../context/LayoutModeContext";
 import { useThemeColors } from "../context/ThemeContext";
 import { useTravel } from "../context/TravelContext";
 import { RootStackParamList } from "../navigation/types";
+import { WEB_TOP_NAV_HEIGHT } from "../navigation/WebTopNav";
 import { ColorPalette } from "../theme/colors";
 
 export default function MapScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const colors = useThemeColors();
+  const { mode } = useLayoutMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { visited, visitedCount, totalCountries, profile } = useTravel();
   const [pinnedCountryId, setPinnedCountryId] = useState<string | null>(null);
@@ -34,6 +38,90 @@ export default function MapScreen() {
     setPinnedCountryId(id);
     navigation.navigate("CountryDetail", { countryId: id, ownerId: "me" });
   };
+
+  const globeColors = {
+    ocean: colors.ocean,
+    unvisited: colors.unvisited,
+    visited: colors.visited,
+    selected: colors.visitedSelected,
+    border: colors.unvisitedStroke,
+  };
+
+  const legend = (
+    <View style={styles.legendRow}>
+      <View style={styles.legendItem}>
+        <View style={[styles.legendDot, { backgroundColor: colors.visited }]} />
+        <Text style={styles.legendText}>Visited</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.legendDot, { backgroundColor: colors.unvisited }]} />
+        <Text style={styles.legendText}>Not yet — pinch to zoom, tap to fill it in</Text>
+      </View>
+    </View>
+  );
+
+  const emptyNudge = visitedCount === 0 && (
+    <View style={styles.emptyNudge}>
+      <Text style={styles.emptyTitle}>Your map is empty</Text>
+      <Text style={styles.emptyBody}>
+        Pinch to zoom in, then tap any country you've been to and it fills in. Every trip
+        you add builds up the picture.
+      </Text>
+    </View>
+  );
+
+  if (mode === "website") {
+    return (
+      <SafeAreaView style={styles.safe} edges={[]}>
+        <ScrollView
+          contentContainerStyle={styles.webScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <ContentWidth maxWidth={1100}>
+            <View style={styles.webHeader}>
+              <Text style={styles.greeting}>Hey {profile.name} 👋</Text>
+              <Text style={styles.title}>Your world map</Text>
+            </View>
+
+            <View style={styles.webRow}>
+              <View style={styles.webMainCol}>
+                <View style={styles.webSearchWrap}>
+                  <CountrySearch onSelectCountry={selectCountry} />
+                </View>
+                <View style={[styles.mapCard, styles.webMapCard]}>
+                  <Globe3D
+                    visitedIds={visitedIds}
+                    selectedId={pinnedCountryId}
+                    onSelectCountry={selectCountry}
+                    colors={globeColors}
+                  />
+                </View>
+                <View style={styles.webLegendRow}>{legend}</View>
+              </View>
+
+              <View style={styles.webSideCol}>
+                <View style={styles.webStatsCard}>
+                  <StatBadge value={visitedCount} label="Visited" />
+                  <StatBadge value={totalCountries - visitedCount} label="Remaining" />
+                  <StatBadge value={`${pct}%`} label="of the world" />
+                </View>
+                {visitedCount === 0 && (
+                  <View style={styles.webEmptyNudge}>
+                    <Text style={styles.emptyTitle}>Your map is empty</Text>
+                    <Text style={styles.emptyBody}>
+                      Pinch to zoom in, then tap any country you've been to and it fills
+                      in. Every trip you add builds up the picture.
+                    </Text>
+                  </View>
+                )}
+                <TravelChecklist />
+              </View>
+            </View>
+          </ContentWidth>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -84,37 +172,12 @@ export default function MapScreen() {
             visitedIds={visitedIds}
             selectedId={pinnedCountryId}
             onSelectCountry={selectCountry}
-            colors={{
-              ocean: colors.ocean,
-              unvisited: colors.unvisited,
-              visited: colors.visited,
-              selected: colors.visitedSelected,
-              border: colors.unvisitedStroke,
-            }}
+            colors={globeColors}
           />
         </View>
 
-        {visitedCount === 0 && (
-          <View style={styles.emptyNudge}>
-            <Text style={styles.emptyTitle}>Your map is empty</Text>
-            <Text style={styles.emptyBody}>
-              Pinch to zoom in, then tap any country you've been to and it fills in. Every
-              trip you add builds up the picture.
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.visited }]} />
-            <Text style={styles.legendText}>Visited</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.unvisited }]} />
-            <Text style={styles.legendText}>Not yet — pinch to zoom, tap to fill it in</Text>
-          </View>
-        </View>
-
+        {emptyNudge}
+        {legend}
         <TravelChecklist />
       </ScrollView>
       </KeyboardAvoidingView>
@@ -127,6 +190,31 @@ function createStyles(colors: ColorPalette) {
     safe: { flex: 1, backgroundColor: colors.bg },
     flex: { flex: 1 },
     scrollContent: { paddingBottom: 32 },
+    webScrollContent: { paddingBottom: 48, paddingTop: WEB_TOP_NAV_HEIGHT + 28, paddingHorizontal: 24 },
+    webHeader: { marginBottom: 20 },
+    webRow: { flexDirection: "row", gap: 28 },
+    webMainCol: { flex: 1.3, minWidth: 0 },
+    webSideCol: { flex: 1, minWidth: 0, gap: 20 },
+    webMapCard: { marginHorizontal: 0 },
+    webSearchWrap: { marginBottom: 12 },
+    webLegendRow: { marginTop: 16 },
+    webEmptyNudge: {
+      padding: 14,
+      borderRadius: 16,
+      backgroundColor: colors.accentSoft,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    webStatsCard: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingVertical: 18,
+      paddingHorizontal: 20,
+    },
     brandRow: {
       flexDirection: "row",
       alignItems: "center",

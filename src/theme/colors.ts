@@ -57,8 +57,10 @@ export const darkColors: ColorPalette = {
   accent2Soft: "#E9B84A33",
   gold: "#F0C36B", // lighter secondary gold for highlights distinct from accent
 
-  unvisited: "#1E2846", // "blacked out" country fill
-  unvisitedStroke: "#2E3A64",
+  unvisited: "#2A3860", // "blacked out" country fill — lifted further off the navy
+  // ocean than the original tone so unfilled land is actually legible against water,
+  // not just theoretically distinct from it.
+  unvisitedStroke: "#3E4E82",
   visited: "#E9B84A", // a touch brighter than the accent so fills lift off the navy ground
   visitedStroke: "#F6D488",
   visitedSelected: "#FFF6E2", // pale cream outline: the only thing that reads on gold here
@@ -87,8 +89,9 @@ export const lightColors: ColorPalette = {
   accent2Soft: "#B0791A26",
   gold: "#8A6417", // darker secondary gold for highlights distinct from accent
 
-  unvisited: "#ECE3D0", // "blacked out" reads as dim/muted-cream on light
-  unvisitedStroke: "#D8CBAE",
+  unvisited: "#DED0AE", // pushed further from the cream ocean than the original
+  // near-invisible tone, same reasoning as the dark palette's unvisited bump.
+  unvisitedStroke: "#B79A66",
   visited: "#E0A83A", // saturated enough to hold its own against the cream ground
   visitedStroke: "#B0791A",
   visitedSelected: "#182242", // navy outline: the only thing that reads on gold here

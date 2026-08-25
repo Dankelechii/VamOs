@@ -15,7 +15,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Button from "../components/Button";
+import ContentWidth from "../components/ContentWidth";
+import { useLayoutMode } from "../context/LayoutModeContext";
 import { useThemeColors } from "../context/ThemeContext";
+import { WEB_TOP_NAV_HEIGHT } from "../navigation/WebTopNav";
 import { SocialError, sendPasswordReset, signIn, signUp, validateUsername } from "../services/social";
 import { ColorPalette } from "../theme/colors";
 
@@ -32,6 +35,7 @@ type Mode = "signIn" | "signUp";
 export default function SignInScreen({ onDone }: { onDone?: () => void }) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { mode: layoutMode } = useLayoutMode();
 
   const [mode, setMode] = useState<Mode>("signUp");
   const [email, setEmail] = useState("");
@@ -86,7 +90,11 @@ export default function SignInScreen({ onDone }: { onDone?: () => void }) {
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.content, layoutMode === "website" && styles.webContent]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ContentWidth maxWidth={440}>
           <Image
             source={require("../../assets/logo-mark-transparent.png")}
             style={styles.mark}
@@ -198,6 +206,7 @@ export default function SignInScreen({ onDone }: { onDone?: () => void }) {
               {mode === "signUp" ? "I already have an account" : "Create an account instead"}
             </Text>
           </Pressable>
+          </ContentWidth>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -209,6 +218,7 @@ function createStyles(colors: ColorPalette) {
     safe: { flex: 1, backgroundColor: colors.bg },
     flex: { flex: 1 },
     content: { padding: 24, paddingBottom: 48 },
+    webContent: { padding: 24, paddingTop: WEB_TOP_NAV_HEIGHT + 28, paddingBottom: 48 },
     mark: { width: 52, height: 52, alignSelf: "center", marginBottom: 14 },
     title: {
       color: colors.textPrimary,

@@ -141,17 +141,31 @@ const FRAGMENT_SHADER = `
       base = mix(uUnvisitedColor, uVisitedColor, visited);
     }
 
-    // Coastline/border: any neighbour texel with a different id gets a thin highlight.
-    float n = idAt(vUv + vec2(0.0, uTexelSize.y));
-    float s = idAt(vUv - vec2(0.0, uTexelSize.y));
-    float e = idAt(vUv + vec2(uTexelSize.x, 0.0));
-    float w = idAt(vUv - vec2(uTexelSize.x, 0.0));
-    bool isBorder = n != id || s != id || e != id || w != id;
+    // Coastline/border: a two-ring neighbour check (1 texel, then 2 texels out) in 8
+    // directions, so a border reads as a solid ~2px line with a soft half-strength
+    // feather at its outer edge instead of the old single hard 1-texel-wide (and
+    // frequently anti-aliased-away-to-invisible) edge.
+    vec2 t1 = uTexelSize;
+    vec2 t2 = uTexelSize * 2.0;
+    bool border1 =
+      idAt(vUv + vec2(0.0, t1.y)) != id || idAt(vUv - vec2(0.0, t1.y)) != id ||
+      idAt(vUv + vec2(t1.x, 0.0)) != id || idAt(vUv - vec2(t1.x, 0.0)) != id ||
+      idAt(vUv + vec2(t1.x, t1.y)) != id || idAt(vUv + vec2(-t1.x, t1.y)) != id ||
+      idAt(vUv + vec2(t1.x, -t1.y)) != id || idAt(vUv + vec2(-t1.x, -t1.y)) != id;
+    bool border2 =
+      idAt(vUv + vec2(0.0, t2.y)) != id || idAt(vUv - vec2(0.0, t2.y)) != id ||
+      idAt(vUv + vec2(t2.x, 0.0)) != id || idAt(vUv - vec2(t2.x, 0.0)) != id;
+    float borderStrength = border1 ? 1.0 : (border2 ? 0.45 : 0.0);
 
-    vec3 color = isBorder ? mix(base, uBorderColor, 0.55) : base;
+    vec3 color = mix(base, uBorderColor, borderStrength);
 
+    // Floor raised well above the old 0.45: this is a country-selection UI, not a
+    // photoreal render, and the previous floor crushed land/ocean/border contrast to
+    // near-black on whichever third of the globe was rotated away from the fixed
+    // light direction at any given moment — exactly the countries a user might be
+    // trying to tap.
     float lambert = max(dot(normalize(vNormal), normalize(uSunDirection)), 0.0);
-    float lighting = 0.45 + 0.55 * lambert;
+    float lighting = 0.72 + 0.28 * lambert;
     gl_FragColor = vec4(color * lighting, 1.0);
   }
 `;
@@ -233,7 +247,10 @@ function GlobeScene({
       uUnvisitedColor: { value: new THREE.Color(colors.unvisited) },
       uVisitedColor: { value: new THREE.Color(colors.visited) },
       uSelectedColor: { value: new THREE.Color(colors.selected) },
-      uBorderColor: { value: new THREE.Color(colors.border) },
+      // Lightened well past the theme's own border token: at globe scale a
+      // same-family border reads as barely-there, and the whole point of this pass
+      // is a border a user can actually see to tell two countries apart.
+      uBorderColor: { value: new THREE.Color(colors.border).offsetHSL(0, 0, 0.22) },
       uSelectedIndex: { value: -1 },
       uSunDirection: { value: new THREE.Vector3(0.6, 0.5, 0.7) },
     }),

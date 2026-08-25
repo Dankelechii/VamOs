@@ -21,12 +21,15 @@ import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { RootStackParamList } from "../navigation/types";
+import { WEB_TOP_NAV_HEIGHT } from "../navigation/WebTopNav";
 import BadgeRow from "../components/BadgeRow";
 import Button from "../components/Button";
+import ContentWidth from "../components/ContentWidth";
 import PhotoWheelCarousel from "../components/PhotoWheelCarousel";
 import TripTimeline from "../components/TripTimeline";
 import StatBadge from "../components/StatBadge";
 import { useTheme, useThemeColors } from "../context/ThemeContext";
+import { useLayoutMode, LayoutMode } from "../context/LayoutModeContext";
 import { useAuth } from "../context/AuthContext";
 import { useTravel } from "../context/TravelContext";
 import { getCurrentBadge, getVisitedContinents } from "../data/badges";
@@ -40,7 +43,11 @@ import { darken, lighten } from "../theme/colorUtils";
 const THEME_OPTIONS: { value: "light" | "dark" | "system"; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: "light", label: "Light", icon: "sunny-outline" },
   { value: "dark", label: "Dark", icon: "moon-outline" },
-  { value: "system", label: "System", icon: "phone-portrait-outline" },
+];
+
+const LAYOUT_OPTIONS: { value: LayoutMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: "mobile", label: "Mobile", icon: "phone-portrait-outline" },
+  { value: "website", label: "Website", icon: "desktop-outline" },
 ];
 
 export default function ProfileScreen() {
@@ -56,6 +63,7 @@ export default function ProfileScreen() {
   } = useTravel();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { preference, setPreference } = useTheme();
+  const { mode: layoutMode, isWeb, setMode: setLayoutMode } = useLayoutMode();
   const { backendConfigured, userId, account } = useAuth();
   const syncState = useMapSync(visited, loaded);
   const colors = useThemeColors();
@@ -224,7 +232,11 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, layoutMode === "website" && styles.webScrollContent]}
+        showsVerticalScrollIndicator={false}
+      >
+      <ContentWidth>
         <Pressable style={styles.headerRow} onPress={openEditModal} accessibilityLabel="Edit your profile">
           <View style={[styles.haloRing, { borderColor: haloColor, shadowColor: haloColor }]}>
             <Pressable
@@ -276,6 +288,29 @@ export default function ProfileScreen() {
             />
           ))}
         </View>
+
+        {isWeb && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Layout</Text>
+              <Text style={styles.sectionHint}>
+                {layoutMode === "website" ? "Wider, desktop-style" : "Phone-shaped"}
+              </Text>
+            </View>
+            <View style={styles.themeRow}>
+              {LAYOUT_OPTIONS.map((opt) => (
+                <ThemeOption
+                  key={opt.value}
+                  opt={opt}
+                  active={layoutMode === opt.value}
+                  onPress={() => setLayoutMode(opt.value)}
+                  colors={colors}
+                  styles={styles}
+                />
+              ))}
+            </View>
+          </>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Continent badges</Text>
@@ -389,6 +424,7 @@ export default function ProfileScreen() {
             </Pressable>
           )}
         </View>
+      </ContentWidth>
       </ScrollView>
 
       <Modal
@@ -506,6 +542,7 @@ function createStyles(colors: ColorPalette) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.bg },
     scrollContent: { paddingBottom: 48 },
+    webScrollContent: { paddingTop: WEB_TOP_NAV_HEIGHT + 28, paddingHorizontal: 24 },
     headerRow: { alignItems: "center", paddingHorizontal: 20, marginTop: 8, marginBottom: 8 },
     // The halo: a ring earned by continent badge, one size up from the avatar so it
     // reads as a glow around it rather than just a thicker border on the avatar
@@ -662,7 +699,7 @@ function createStyles(colors: ColorPalette) {
   });
 }
 
-type ThemeOpt = { value: "light" | "dark" | "system"; label: string; icon: keyof typeof Ionicons.glyphMap };
+type ThemeOpt = { value: string; label: string; icon: keyof typeof Ionicons.glyphMap };
 
 function ThemeOption({
   opt,
