@@ -31,6 +31,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments": {
+      "baseUrl": "/VamOs"
+    },
     "plugins": [
       [
         "expo-image-picker",

@@ -4,6 +4,8 @@ A social travel app: fill in countries on a world map as you visit them, save ph
 
 The map, trips, notes and checklist work fully offline on device storage (`AsyncStorage`) — no account needed. Accounts, usernames, friend requests, and map sync — including trip photos — are real, running against Supabase (see `supabase/README.md` for setup); the Friends tab explains plainly when no backend is configured and falls back to local-only.
 
+**Try it in your browser:** [dankelechii.github.io/VamOs](https://dankelechii.github.io/VamOs/) — same real app, running on `react-native-web`. A couple of things behave differently on web: Instagram sharing falls back to whatever your browser's share sheet offers (or nothing, on browsers without one), and pinch-to-zoom on the map is built for touch, so mouse/trackpad panning feels different. Everything else — accounts, friends, trip logging, photos — works the same as on a phone.
+
 ## What's in here
 
 - **Map tab** — a stylized, pinch-to-zoom/pan world map (177 countries). Unvisited countries are dark ("blacked out"); tap one to view it, mark it visited, add notes, and attach photos from your camera roll.
