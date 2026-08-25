@@ -17,10 +17,18 @@ const fs = require("fs");
 const path = require("path");
 const topojson = require("topojson-client");
 const { PNG } = require("pngjs");
-const topology = require("world-atlas/countries-110m.json");
+// 50m (not 110m, the flat map's source): world-atlas is a dev-only dependency, used
+// only here at generate-time, so its own file size costs the shipped app nothing —
+// only the OUTPUT (the raster below, and the ring geometry for hit-testing) ends up in
+// the bundle. 50m gives meaningfully more accurate, less blocky border shapes than
+// 110m for a still-reasonable jump in that output size; 10m would sharpen further but
+// bloats the hit-test ring file for diminishing visual return at globe scale.
+const topology = require("world-atlas/countries-50m.json");
 
-const WIDTH = 2048;
-const HEIGHT = 1024;
+// 4x the pixel density of the original 2048x1024: small, closely-packed countries
+// (a lot of West Africa, the Balkans) were visibly blocky at the old resolution.
+const WIDTH = 4096;
+const HEIGHT = 2048;
 
 const ROOT = path.join(__dirname, "..");
 const WORLD_COUNTRIES_TS = path.join(ROOT, "src/data/worldCountries.ts");

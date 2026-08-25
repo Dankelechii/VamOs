@@ -207,7 +207,7 @@ function GlobeScene({
     () => ({
       uIdMap: { value: idMap },
       uVisited: { value: visitedTexture },
-      uTexelSize: { value: new THREE.Vector2(1 / 2048, 1 / 1024) },
+      uTexelSize: { value: new THREE.Vector2(1 / 4096, 1 / 2048) },
       uOceanColor: { value: new THREE.Color(colors.ocean) },
       uUnvisitedColor: { value: new THREE.Color(colors.unvisited) },
       uVisitedColor: { value: new THREE.Color(colors.visited) },
